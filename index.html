@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Bananagrams Helper</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: -apple-system, sans-serif; max-width: 600px; margin: 20px auto; padding: 10px; background: #fdf6e3; color: #586e75; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        h2 { margin-top: 0; color: #b58900; }
+        input { width: 100%; padding: 12px; font-size: 18px; margin: 10px 0; border: 2px solid #eee; border-radius: 8px; box-sizing: border-box; outline: none; }
+        input:focus { border-color: #268bd2; }
+        button { background: #268bd2; color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; width: 100%; font-size: 18px; font-weight: bold; }
+
+        .result-group { margin-top: 25px; }
+        .group-header { font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #93a1a1; border-bottom: 1px solid #eee; margin-bottom: 10px; padding-bottom: 5px; }
+
+        .word-link { text-decoration: none; color: inherit; display: inline-block; }
+        .word-pill { background: #eee; padding: 8px 12px; margin: 4px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 1.1em; transition: transform 0.1s; border: 1px solid #ddd; }
+        .word-pill:active { transform: scale(0.95); background: #d33682; color: white; }
+        .added { color: #d33682; font-weight: bold; }
+        .word-pill:active .added { color: white; }
+
+        .breadcrumb { margin-bottom: 15px; font-size: 0.9em; }
+        .breadcrumb a { color: #268bd2; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>🍌 Banagrams</h2>
+
+        <form method="GET">
+            <input type="text" name="root" id="root" placeholder="Enter root word..." autocomplete="off" autofocus>
+            <button type="submit">Find Evolutions</button>
+        </form>
+
+        <div id="output"></div>
+    </div>
+
+<script>
+// --- Logic Constants ---
+const FILE_PATH = 'words.txt';
+const TILE_VALUES = {
+    A: 13, B: 3, C: 3, D: 6, E: 18, F: 3, G: 4, H: 3, I: 12,
+    J: 2, K: 2, L: 5, M: 3, N: 8, O: 11, P: 3, Q: 2, R: 9,
+    S: 6, T: 9, U: 6, V: 3, W: 3, X: 2, Y: 3, Z: 2
+};
+
+function getWordList() {
+    return fetch(FILE_PATH).then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.text();
+    }).then((text) => text.split('\n').map((line) => line.trim()));
+}
+
+function getScore(word) {
+    let score = 0;
+    for (const c of word) score += TILE_VALUES[c.toUpperCase()] || 0;
+    return score;
+}
+
+function counter(word) {
+    const counts = {};
+    for (const c of word) counts[c] = (counts[c] || 0) + 1;
+    return counts;
+}
+
+function findMatches(root, fullList) {
+    const rootCounts = counter(root);
+    const rootLen = [...root].length;
+    const foundMatches = {};
+    for (const word of fullList) {
+        // Look for words 1 to 3 letters longer
+        const length = [...word].length;
+        if (rootLen < length && length <= rootLen + 3) {
+            const wordCounts = counter(word);
+            if (Object.entries(rootCounts).every(([c, count]) => (wordCounts[c] || 0) >= count)) {
+                // Create styling info
+                const tempRoot = { ...rootCounts };
+                const styledChars = [];
+                for (const char of word) {
+                    if (tempRoot[char] > 0) {
+                        styledChars.push([char, false]);
+                        tempRoot[char] -= 1;
+                    } else {
+                        styledChars.push([char, true]);
+                    }
+                }
+                (foundMatches[length] ||= []).push({ raw: word, styled: styledChars, score: getScore(word) });
+            }
+        }
+    }
+
+    const results = {};
+    const sortedKeys = Object.keys(foundMatches).map(Number).sort((a, b) => a - b);
+    for (const length of sortedKeys) {
+        // Sort words by score within their length group
+        foundMatches[length].sort((a, b) => b.score - a.score);
+        results[length] = foundMatches[length].slice(0, 20);
+    }
+    return { results, sortedKeys };
+}
+
+function el(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+}
+
+function render(root, results, sortedKeys) {
+    const output = document.getElementById('output');
+    output.replaceChildren();
+
+    if (root) {
+        const breadcrumb = el('div', 'breadcrumb', 'Showing results for ');
+        breadcrumb.append(el('strong', '', root.toUpperCase()));
+        output.append(breadcrumb);
+    }
+
+    if (sortedKeys.length) {
+        const rootLen = [...root].length;
+        for (const length of sortedKeys) {
+            const group = el('div', 'result-group');
+            group.append(el('div', 'group-header', `+${length - rootLen} Letters`));
+            // Spaces between letters and pills mirror the whitespace the Flask template renders
+            results[length].forEach((item, i) => {
+                if (i > 0) group.append(' ');
+                const link = el('a', 'word-link');
+                link.href = `?root=${encodeURIComponent(item.raw)}`;
+                const pill = el('div', 'word-pill');
+                item.styled.forEach(([char, isAdded], j) => {
+                    if (j > 0) pill.append(' ');
+                    pill.append(el('span', isAdded ? 'added' : '', char));
+                });
+                link.append(pill);
+                group.append(link);
+            });
+            output.append(group);
+        }
+    } else if (root) {
+        const p = el('p', '', `No common words found building off "${root}".`);
+        p.style.marginTop = '20px';
+        output.append(p);
+    }
+}
+
+// Get root from URL query parameters (?root=...)
+const root = (new URLSearchParams(location.search).get('root') || '').toLowerCase().trim();
+document.getElementById('root').value = root;
+
+if (root) {
+    getWordList()
+        .then((fullList) => {
+            const { results, sortedKeys } = findMatches(root, fullList);
+            render(root, results, sortedKeys);
+        })
+        .catch((err) => {
+            document.getElementById('output').textContent = `Failed to load ${FILE_PATH}: ${err.message}`;
+        });
+}
+</script>
+</body>
+</html>
