@@ -8,7 +8,7 @@ It's a static page, so everything runs in the browser and no server is needed.
 
 ## Regenerating the word list
 
-`words.txt` is built from the [wordfreq](https://pypi.org/project/wordfreq/) package. To exclude proper nouns and abbreviations, the list is filtered against the public-domain [ENABLE](https://github.com/dolph/dictionary) word game dictionary.
+`words.txt` is built from the [wordfreq](https://pypi.org/project/wordfreq/) package. The list is filtered against the [ENABLE](https://github.com/dolph/dictionary) word game dictionary and the [SCOWL](http://wordlist.aspell.net/) spellchecker lists. This keeps words most people would know and excludes proper nouns, abbreviations, and obscure words.
 
 ```
 pip install wordfreq
