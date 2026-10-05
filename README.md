@@ -8,7 +8,7 @@ It's a static page, so everything runs in the browser and no server is needed.
 
 ## Regenerating the word list
 
-`words.txt` is built from the [wordfreq](https://pypi.org/project/wordfreq/) package:
+`words.txt` is built from the [wordfreq](https://pypi.org/project/wordfreq/) package. To exclude proper nouns and abbreviations, the list is filtered against the public-domain [ENABLE](https://github.com/dolph/dictionary) word game dictionary.
 
 ```
 pip install wordfreq
